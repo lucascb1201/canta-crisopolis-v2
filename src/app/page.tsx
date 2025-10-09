@@ -134,7 +134,7 @@ export default function Home() {
       <div className="bg-gradient-music py-20 px-4">
         <div className="max-w-6xl mx-auto text-center">
           <FaMusic className="text-6xl mx-auto mb-6 animate-float" />
-          <h1 className="text-5xl font-bold mb-4">Concurso de Cantores</h1>
+          <h1 className="text-5xl font-bold mb-4">Canta Crisópolis</h1>
           <p className="text-xl text-gray-200 mb-8">
             Vote nos seus artistas favoritos e ajude a escolher os melhores!
           </p>
@@ -303,7 +303,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="bg-gray-900 py-8 mt-20">
         <div className="max-w-6xl mx-auto px-4 text-center text-gray-400">
-          <p>&copy; 2025 Concurso de Cantores. Todos os direitos reservados.</p>
+          <p>&copy; 2025 Canta Crisópolis. Todos os direitos reservados.</p>
         </div>
       </footer>
     </div>

@@ -6,8 +6,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Concurso de Cantores - Votação",
-  description: "Sistema de votação para concurso de cantores",
+  title: "Canta Crisópolis - Votação",
+  description: "Sistema de votação do Canta Crisópolis 2025",
 };
 
 export default function RootLayout({

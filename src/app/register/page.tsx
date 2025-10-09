@@ -270,7 +270,7 @@ export default function RegisterPage() {
             <p className="text-sm text-gray-300">
               <strong>Atenção:</strong> Ao enviar este formulário, você concorda
               que seus dados sejam armazenados para fins de contato relacionados
-              ao concurso de cantores.
+              ao Canta Crisópolis.
             </p>
           </div>
 
@@ -293,7 +293,7 @@ export default function RegisterPage() {
 
       <footer className="bg-gray-900 py-8 mt-20">
         <div className="max-w-6xl mx-auto px-4 text-center text-gray-400">
-          <p>&copy; 2025 Concurso de Cantores. Todos os direitos reservados.</p>
+          <p>&copy; 2025 Canta Crisópolis. Todos os direitos reservados.</p>
         </div>
       </footer>
     </div>
