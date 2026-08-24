@@ -293,7 +293,10 @@ export default function RegisterPage() {
 
       <footer className="bg-gray-900 py-8 mt-20">
         <div className="max-w-6xl mx-auto px-4 text-center text-gray-400">
-          <p>&copy; 2025 Canta Crisópolis. Todos os direitos reservados.</p>
+          <p>
+            &copy; {new Date().getFullYear()} Canta Crisópolis. Todos os
+            direitos reservados.
+          </p>
         </div>
       </footer>
     </div>
