@@ -60,14 +60,21 @@ Em **Settings → Environment Variables**:
 | `JWT_SECRET`                 | Mínimo 32 caracteres aleatórios (`openssl rand -hex 32`) |
 | `ADMIN_USERNAME`             | Usuário do painel                                        |
 | `ADMIN_PASSWORD`             | Senha do painel                                          |
-| `NEXT_PUBLIC_MEDIA_BASE_URL` | Deixe **vazia** (serve direto do domínio do Blob)         |
+| `NEXT_PUBLIC_MEDIA_BASE_URL` | **Não cadastre** (serve direto do domínio do Blob)        |
 | `BLOB_READ_WRITE_TOKEN`      | **Injetado pela Vercel** ao conectar o Blob store        |
 
 Sem `JWT_SECRET` a aplicação lança erro em vez de assinar com um segredo padrão.
 Sem `ADMIN_USERNAME`/`ADMIN_PASSWORD` o login responde 500 em vez de autenticar.
 
-`NEXT_PUBLIC_MEDIA_BASE_URL` é lida no build do bundle client — se um dia for
-preenchida, é preciso **redeploy**, não basta salvar a variável.
+Sobre `NEXT_PUBLIC_MEDIA_BASE_URL`: o mais simples é **não criá-la**. Ao criar,
+a Vercel sugere remover o prefixo `NEXT_PUBLIC_` para "manter o valor privado" —
+**não siga essa sugestão**. A variável é lida em `src/app/page.tsx`, um client
+component; sem o prefixo ela chega `undefined` no browser e é ignorada em
+silêncio, sem erro. Expor é inofensivo: é o hostname de um CDN público, já
+visível em cada `<img src>` da página.
+
+Ela também é lida no build do bundle client — ao alterá-la é preciso
+**redeploy**, não basta salvar a variável.
 
 ## 4. Domínio de leitura da mídia
 
@@ -80,9 +87,10 @@ https://4tf85brexuw1cgkz.public.blob.vercel-storage.com/<pathname>
 Não há nada a configurar — o Blob já tem CDN próprio e certificado válido, e a
 URL canônica salva no banco é a que vai para o `<img>` e o `<audio>`.
 
-Deixe `NEXT_PUBLIC_MEDIA_BASE_URL` **vazia**. Preenchida, ela troca a origem das
+Não cadastre `NEXT_PUBLIC_MEDIA_BASE_URL`. Preenchida, ela troca a origem das
 URLs na renderização (`src/lib/media.ts`) — é a porta de entrada para colocar um
 CDN próprio na frente do Blob mais tarde, sem migrar nada do que já está salvo.
+Se um dia for usada, o prefixo `NEXT_PUBLIC_` é obrigatório.
 
 > **Custo:** o Vercel Blob cobra Data Transfer na saída, e sem CDN intermediário
 > toda reprodução de música sai dele. Se a banda virar problema, as saídas são

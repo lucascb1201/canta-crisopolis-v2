@@ -214,7 +214,7 @@ Sim! Checklist mínimo:
 - [ ] `ADMIN_USERNAME` / `ADMIN_PASSWORD` definidos, com senha forte
 - [ ] Cluster no MongoDB Atlas com senha forte e Network Access liberado
 - [ ] Blob store criado e conectado ao projeto na Vercel
-- [ ] `NEXT_PUBLIC_MEDIA_BASE_URL` vazia (mídia servida pelo domínio do Blob)
+- [ ] `NEXT_PUBLIC_MEDIA_BASE_URL` não cadastrada (mídia sai do domínio do Blob)
 - [ ] Backup (`mongodump`) antes e depois da apuração
 
 HTTPS vem pronto da Vercel — não há nada a configurar.

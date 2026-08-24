@@ -181,7 +181,7 @@ JWT_SECRET=                     # Mínimo 32 caracteres aleatórios
 ADMIN_USERNAME=                 # Usuário do painel
 ADMIN_PASSWORD=                 # Senha do painel
 BLOB_READ_WRITE_TOKEN=          # Injetado pela Vercel ao conectar o Blob store
-NEXT_PUBLIC_MEDIA_BASE_URL=     # CDN de mídia; vazio em dev = servir do Blob
+NEXT_PUBLIC_MEDIA_BASE_URL=     # opcional; vazio = servir do domínio do Blob
 ```
 
 ## 🐛 Troubleshooting

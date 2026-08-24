@@ -1,3 +1,8 @@
+// Precisa do prefixo NEXT_PUBLIC_: toPublicMediaUrl roda em `src/app/page.tsx`,
+// que é um client component. Sem o prefixo o valor chega como undefined no
+// browser e a troca de origem simplesmente não acontece — sem erro nenhum.
+// Expor é inofensivo: é o hostname de um CDN público, já visível em cada
+// <img src> e <audio src> da página.
 const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE_URL;
 
 const BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
