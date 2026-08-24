@@ -28,7 +28,7 @@ hospedado na Vercel.
 - **Backend**: Next.js API Routes
 - **Banco de Dados**: MongoDB (Atlas em produção)
 - **Hospedagem**: Vercel
-- **Mídia**: Vercel Blob para armazenamento, Cloudflare como CDN de leitura
+- **Mídia**: Vercel Blob (armazenamento e entrega pelo domínio público do store)
 - **Autenticação**: JWT em cookie HTTP-only, credenciais em variáveis de ambiente
 - **Identificação de Dispositivo**: FingerprintJS
 
@@ -56,7 +56,7 @@ Passo a passo detalhado, incluindo como testar upload de mídia localmente:
 
 ### Produção
 
-Deploy na Vercel, com MongoDB Atlas, Vercel Blob e Cloudflare como CDN de mídia:
+Deploy na Vercel, com MongoDB Atlas e Vercel Blob:
 [`DEPLOYMENT.md`](./DEPLOYMENT.md).
 
 ## 📱 Uso do Sistema
@@ -97,9 +97,11 @@ Serverless Function na Vercel aceita no máximo ~4.5MB de body, e um MP3 estoura
 isso. A API só emite um token de upload de curta duração, depois de validar que
 quem pediu é admin.
 
-A leitura passa por `media.cantacrisopolis.com.br`, um Cloudflare Worker
-(`cloudflare/media-proxy.js`) que faz proxy do Blob, para que a banda dos MP3
-seja absorvida pelo CDN em vez de sair do Data Transfer da Vercel.
+A leitura sai do domínio público do próprio store
+(`4tf85brexuw1cgkz.public.blob.vercel-storage.com`), que já vem com CDN. Se um
+dia for preciso colocar um proxy com cache na frente para conter o Data
+Transfer, basta apontar `NEXT_PUBLIC_MEDIA_BASE_URL` para ele — nada do que está
+salvo no banco muda.
 
 Limites aplicados no servidor:
 
@@ -203,14 +205,15 @@ Se o arquivo for recusado, verifique tipo e tamanho contra a tabela de limites.
 
 ### Mídia não carrega em produção
 
-Teste a URL do CDN direto:
+Teste a URL salva no banco direto:
 
 ```bash
-curl -sI https://media.cantacrisopolis.com.br/<pathname>
+curl -sI https://4tf85brexuw1cgkz.public.blob.vercel-storage.com/<pathname>
 ```
 
-`500` significa que a variável `BLOB_HOST` do Worker não foi configurada;
-`404`, que o pathname está errado. Veja `DEPLOYMENT.md`.
+Se ela responder `200` mas a página não exibir, confira se
+`NEXT_PUBLIC_MEDIA_BASE_URL` está vazia — preenchida com um valor errado, ela
+reescreve a origem das URLs para um domínio que não existe.
 
 ### Problemas com fingerprint
 

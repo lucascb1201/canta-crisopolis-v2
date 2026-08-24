@@ -6,7 +6,7 @@
 
 - ✅ Deploy na Vercel (funções em gru1/São Paulo)
 - ✅ MongoDB Atlas em produção, Docker Compose com MongoDB local em dev
-- ✅ Vercel Blob para mídia, com Cloudflare como CDN de leitura
+- ✅ Vercel Blob para mídia (upload direto do browser, entrega pelo CDN do store)
 - ✅ Configurações de ambiente (.env.example)
 
 ### 🗄️ Banco de Dados

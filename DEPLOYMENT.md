@@ -1,4 +1,4 @@
-# Deploy — Vercel + MongoDB Atlas + Vercel Blob + Cloudflare
+# Deploy — Vercel + MongoDB Atlas + Vercel Blob
 
 Arquitetura de produção:
 
@@ -7,14 +7,11 @@ Navegador
   ├── HTML/API ──────────► Vercel (Next.js Serverless, região gru1)
   │                            └── MongoDB Atlas
   ├── upload de mídia ───► Vercel Blob (direto do browser, sem passar pela função)
-  └── leitura de mídia ──► media.cantacrisopolis.com.br (Cloudflare CDN → Vercel Blob)
+  └── leitura de mídia ──► Vercel Blob (domínio público do store)
 ```
 
 O upload vai **direto do browser para o Blob**. Isso é obrigatório: uma Serverless
 Function na Vercel aceita no máximo ~4.5MB de body, e um MP3 estoura isso.
-
-A leitura passa pela Cloudflare para que a banda dos MP3 — o item mais pesado,
-baixado por cada votante — não saia do Data Transfer cobrado pela Vercel.
 
 ---
 
@@ -41,8 +38,8 @@ criadas na primeira escrita.
 1. No dashboard da Vercel: **Storage** → **Create Database** → **Blob**.
 2. Conecte o store ao projeto. A Vercel injeta `BLOB_READ_WRITE_TOKEN` nas
    variáveis de ambiente automaticamente — **não** cadastre esse token à mão.
-3. Anote o hostname do store (`<store-id>.public.blob.vercel-storage.com`). Ele é
-   necessário no passo do Cloudflare.
+3. O hostname do store (`4tf85brexuw1cgkz.public.blob.vercel-storage.com`) é o
+   domínio público de onde a mídia será servida.
 
 Limites aplicados pelo servidor em `src/app/api/upload/route.ts`:
 
@@ -63,79 +60,34 @@ Em **Settings → Environment Variables**:
 | `JWT_SECRET`                 | Mínimo 32 caracteres aleatórios (`openssl rand -hex 32`) |
 | `ADMIN_USERNAME`             | Usuário do painel                                        |
 | `ADMIN_PASSWORD`             | Senha do painel                                          |
-| `NEXT_PUBLIC_MEDIA_BASE_URL` | `https://media.cantacrisopolis.com.br`                   |
+| `NEXT_PUBLIC_MEDIA_BASE_URL` | Deixe **vazia** (serve direto do domínio do Blob)         |
 | `BLOB_READ_WRITE_TOKEN`      | **Injetado pela Vercel** ao conectar o Blob store        |
 
 Sem `JWT_SECRET` a aplicação lança erro em vez de assinar com um segredo padrão.
 Sem `ADMIN_USERNAME`/`ADMIN_PASSWORD` o login responde 500 em vez de autenticar.
 
-`NEXT_PUBLIC_MEDIA_BASE_URL` é lida no build do bundle client — ao alterá-la é
-preciso **redeploy**, não basta salvar a variável.
+`NEXT_PUBLIC_MEDIA_BASE_URL` é lida no build do bundle client — se um dia for
+preenchida, é preciso **redeploy**, não basta salvar a variável.
 
-## 4. Cloudflare — `media.cantacrisopolis.com.br`
+## 4. Domínio de leitura da mídia
 
-Objetivo: servir os arquivos do Blob pelo CDN, pagando banda do Vercel Blob só
-no cache MISS.
+A mídia é servida direto pelo domínio público do Blob store:
 
-O Vercel Blob **não suporta domínio customizado nativamente**, e o caminho
-"CNAME + Origin Rule com Host Header override" **não funciona fora do plano
-Enterprise** — Host header, SNI e DNS record são recursos Enterprise no Origin
-Rules. A forma que funciona no plano Free é um Worker.
-
-O código está em [`cloudflare/media-proxy.js`](../cloudflare/media-proxy.js).
-
-### 4.1 Descobrir o hostname do store
-
-Faça um upload qualquer pelo painel e olhe a URL salva. Ela tem a forma
-`https://abc123def456.public.blob.vercel-storage.com/...` — a parte antes de
-`/` é o `BLOB_HOST`.
-
-### 4.2 Deploy do Worker
-
-**Via wrangler** (recomendado):
-
-```bash
-cd cloudflare
-# edite BLOB_HOST no wrangler.toml
-npx wrangler deploy
+```
+https://4tf85brexuw1cgkz.public.blob.vercel-storage.com/<pathname>
 ```
 
-O `custom_domain = true` na rota faz a Cloudflare criar o registro DNS e o
-certificado de `media.cantacrisopolis.com.br` sozinha.
+Não há nada a configurar — o Blob já tem CDN próprio e certificado válido, e a
+URL canônica salva no banco é a que vai para o `<img>` e o `<audio>`.
 
-**Via dashboard**, se preferir não usar CLI:
+Deixe `NEXT_PUBLIC_MEDIA_BASE_URL` **vazia**. Preenchida, ela troca a origem das
+URLs na renderização (`src/lib/media.ts`) — é a porta de entrada para colocar um
+CDN próprio na frente do Blob mais tarde, sem migrar nada do que já está salvo.
 
-1. **Workers & Pages** → **Create** → **Worker**, nome `canta-crisopolis-media`
-2. Cole o conteúdo de `cloudflare/media-proxy.js` e faça deploy
-3. **Settings** → **Variables** → adicione `BLOB_HOST` com o hostname do store
-4. **Settings** → **Domains & Routes** → **Add** → **Custom domain** →
-   `media.cantacrisopolis.com.br`
-
-### 4.3 Validação
-
-```bash
-curl -sI https://media.cantacrisopolis.com.br/<pathname-de-um-arquivo>
-```
-
-- 1ª chamada: `200` + `cf-cache-status: MISS`
-- 2ª chamada: `200` + `cf-cache-status: HIT` ← confirma que a banda parou de sair do Blob
-- `content-type` correto (`audio/mpeg` para MP3)
-
-Se vier `500 BLOB_HOST is not configured`, a variável não foi salva. Se vier
-`404`, confira o pathname — ele é exatamente o que vem depois do domínio na URL
-canônica do Blob.
-
-### 4.4 Limites a conhecer
-
-- **Workers Free: 100.000 requests/dia.** Cada arquivo servido conta, mesmo em
-  cache HIT (a rota sempre invoca o Worker). Um evento com milhares de votantes
-  ouvindo várias músicas pode chegar perto disso — vale acompanhar no dashboard.
-- **Requests com `Range`** (o que o navegador usa para dar seek em áudio) são
-  repassados ao Blob e respondem `206`. O cache é menos eficiente nesse caso;
-  o efeito é banda extra, não falha.
-- Servir volume alto de áudio pelo Free tier esbarra na política de uso da
-  Cloudflare para mídia não-HTML. Para o porte de um concurso municipal não deve
-  ser problema, mas vale conhecer o limite.
+> **Custo:** o Vercel Blob cobra Data Transfer na saída, e sem CDN intermediário
+> toda reprodução de música sai dele. Se a banda virar problema, as saídas são
+> um proxy com cache (Cloudflare Worker, apontando `NEXT_PUBLIC_MEDIA_BASE_URL`
+> para ele) ou migrar para um storage com egress zero, como o Cloudflare R2.
 
 ## 5. Deploy
 
@@ -151,8 +103,8 @@ Os deploys seguintes saem de `git push`.
 - [ ] Senha errada devolve 401
 - [ ] Criar votação com foto e música funciona; no DevTools, o `PUT` do arquivo
       vai para `*.vercel-storage.com`, **não** para `/api/votings`
-- [ ] Na home, `<img>` e `<audio>` apontam para `media.cantacrisopolis.com.br`
-- [ ] `cf-cache-status: HIT` na segunda requisição de mídia
+- [ ] Na home, `<img>` e `<audio>` carregam a partir de
+      `4tf85brexuw1cgkz.public.blob.vercel-storage.com`
 - [ ] O MP3 só é baixado ao clicar em "Ouvir" (`preload="none"`)
 - [ ] Votar funciona; votar de novo no mesmo dispositivo é bloqueado
 - [ ] Com "Resultados Ocultos", a resposta de `GET /api/votings` não traz `votes`
@@ -167,9 +119,10 @@ hora, troque também o `JWT_SECRET`.
 **Backup:** Atlas M0 não tem backup automático. Para um evento com resultado
 oficial, use `mongodump` antes e depois da apuração, ou suba para M10.
 
-**Custos:** Vercel Hobby + Atlas M0 + Cloudflare Free = US$ 0/mês. O Vercel Blob
-cobra por GB armazenado; com a Cloudflare na frente, a saída de dados fica
-restrita aos cache MISS.
+**Custos:** Vercel Hobby + Atlas M0 = US$ 0/mês. O Vercel Blob cobra por GB
+armazenado **e por Data Transfer** — sem CDN intermediário, cada reprodução de
+música conta. Acompanhe o consumo em Storage → Blob no dashboard durante o
+evento.
 
 ## 8. Limitações conhecidas
 

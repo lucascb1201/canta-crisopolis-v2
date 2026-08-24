@@ -326,7 +326,7 @@ voting/
 ```
 
 > Fotos e músicas não ficam no repositório nem no filesystem: vão para o Vercel
-> Blob e são servidas pelo CDN em `media.cantacrisopolis.com.br`.
+> Blob e são servidas pelo domínio público do store.
 
 ## Tecnologias e Propósito
 
@@ -359,7 +359,6 @@ voting/
 │  ├─ Vercel            ► Hospedagem serverless        │
 │  ├─ MongoDB Atlas     ► Banco gerenciado             │
 │  ├─ Vercel Blob       ► Armazenamento de mídia       │
-│  ├─ Cloudflare        ► CDN de leitura da mídia      │
 │  └─ Docker Compose    ► MongoDB local (dev)          │
 │                                                       │
 └──────────────────────────────────────────────────────┘

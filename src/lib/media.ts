@@ -4,8 +4,11 @@ const BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
 
 /**
  * O banco guarda a URL canônica do Vercel Blob (é o que `del()` precisa
- * receber). A leitura pública passa pelo CDN da Cloudflare, então a origem é
- * trocada aqui, no momento da renderização.
+ * receber) e é ela que é servida ao público.
+ *
+ * Se um dia entrar um CDN na frente do Blob, basta apontar
+ * NEXT_PUBLIC_MEDIA_BASE_URL para ele: a origem é trocada aqui, na
+ * renderização, sem tocar no que está salvo.
  */
 export function toPublicMediaUrl(url?: string | null): string {
   if (!url) return "";

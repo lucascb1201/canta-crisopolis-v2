@@ -144,10 +144,9 @@ npx vercel env pull .env.local
 
 ### ❓ Música não reproduz
 
-0. Em produção, teste a URL do CDN direto:
-   `curl -sI https://media.cantacrisopolis.com.br/<pathname>`.
-   `500` indica `BLOB_HOST` não configurado no Worker; `404`, pathname errado
-   (veja `DEPLOYMENT.md`).
+0. Em produção, teste a URL do Blob direto:
+   `curl -sI https://4tf85brexuw1cgkz.public.blob.vercel-storage.com/<pathname>`.
+   Se responder `200`, o problema não é o storage.
 1. Verifique se o arquivo foi salvo corretamente
 2. Abra o console do navegador (F12) para ver erros
 3. Verifique se o formato do arquivo é suportado pelo navegador
@@ -215,20 +214,20 @@ Sim! Checklist mínimo:
 - [ ] `ADMIN_USERNAME` / `ADMIN_PASSWORD` definidos, com senha forte
 - [ ] Cluster no MongoDB Atlas com senha forte e Network Access liberado
 - [ ] Blob store criado e conectado ao projeto na Vercel
-- [ ] `media.cantacrisopolis.com.br` configurado na Cloudflare
+- [ ] `NEXT_PUBLIC_MEDIA_BASE_URL` vazia (mídia servida pelo domínio do Blob)
 - [ ] Backup (`mongodump`) antes e depois da apuração
 
 HTTPS vem pronto da Vercel — não há nada a configurar.
 
 ### ❓ Quanto custa hospedar?
 
-A configuração atual custa **US$ 0/mês**: Vercel Hobby + MongoDB Atlas M0 +
-Cloudflare Free.
+A configuração atual custa **US$ 0/mês**: Vercel Hobby + MongoDB Atlas M0.
 
 O que pode gerar custo conforme o volume:
 
-- **Vercel Blob**: cobra por GB armazenado. Com a Cloudflare na frente, a saída
-  de dados fica limitada aos cache MISS.
+- **Vercel Blob**: cobra por GB armazenado **e por Data Transfer**. Como a mídia
+  é servida direto do Blob, cada reprodução de música conta — é o item a
+  acompanhar num evento com muito acesso.
 - **Atlas M0**: 512 MB e sem backup automático. Para um evento com resultado
   oficial, considere o M10 (~US$ 57/mês) ou faça `mongodump` manual.
 
