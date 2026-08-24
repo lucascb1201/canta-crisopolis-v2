@@ -146,8 +146,8 @@ npx vercel env pull .env.local
 
 0. Em produção, teste a URL do CDN direto:
    `curl -sI https://media.cantacrisopolis.com.br/<pathname>`.
-   `403`/`404` costuma indicar Origin Rule ausente na Cloudflare (veja
-   `DEPLOYMENT.md`).
+   `500` indica `BLOB_HOST` não configurado no Worker; `404`, pathname errado
+   (veja `DEPLOYMENT.md`).
 1. Verifique se o arquivo foi salvo corretamente
 2. Abra o console do navegador (F12) para ver erros
 3. Verifique se o formato do arquivo é suportado pelo navegador

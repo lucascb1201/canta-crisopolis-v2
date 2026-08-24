@@ -74,30 +74,44 @@ preciso **redeploy**, não basta salvar a variável.
 
 ## 4. Cloudflare — `media.cantacrisopolis.com.br`
 
-Objetivo: servir os arquivos do Blob pelo CDN, pagando banda só no cache MISS.
+Objetivo: servir os arquivos do Blob pelo CDN, pagando banda do Vercel Blob só
+no cache MISS.
 
-1. **DNS** → registro `CNAME`:
-   - Nome: `media`
-   - Destino: `<store-id>.public.blob.vercel-storage.com`
-   - Proxy: **ativado** (nuvem laranja)
+O Vercel Blob **não suporta domínio customizado nativamente**, e o caminho
+"CNAME + Origin Rule com Host Header override" **não funciona fora do plano
+Enterprise** — Host header, SNI e DNS record são recursos Enterprise no Origin
+Rules. A forma que funciona no plano Free é um Worker.
 
-2. **Rules → Origin Rules** → nova regra:
-   - Quando: `Hostname equals media.cantacrisopolis.com.br`
-   - Então: **Host Header → Rewrite to** `<store-id>.public.blob.vercel-storage.com`
+O código está em [`cloudflare/media-proxy.js`](../cloudflare/media-proxy.js).
 
-   Sem isso o Blob recebe `Host: media.cantacrisopolis.com.br`, não reconhece o
-   store e devolve erro. Disponível no plano Free.
+### 4.1 Descobrir o hostname do store
 
-3. **Rules → Cache Rules** → nova regra:
-   - Quando: `Hostname equals media.cantacrisopolis.com.br`
-   - Então: **Eligible for cache**, Edge TTL longo (1 ano)
+Faça um upload qualquer pelo painel e olhe a URL salva. Ela tem a forma
+`https://abc123def456.public.blob.vercel-storage.com/...` — a parte antes de
+`/` é o `BLOB_HOST`.
 
-   Os uploads usam `addRandomSuffix: true`, então cada arquivo tem URL única e
-   imutável — nunca é preciso fazer purge.
+### 4.2 Deploy do Worker
 
-4. **SSL/TLS** → modo **Full (strict)**.
+**Via wrangler** (recomendado):
 
-Validação:
+```bash
+cd cloudflare
+# edite BLOB_HOST no wrangler.toml
+npx wrangler deploy
+```
+
+O `custom_domain = true` na rota faz a Cloudflare criar o registro DNS e o
+certificado de `media.cantacrisopolis.com.br` sozinha.
+
+**Via dashboard**, se preferir não usar CLI:
+
+1. **Workers & Pages** → **Create** → **Worker**, nome `canta-crisopolis-media`
+2. Cole o conteúdo de `cloudflare/media-proxy.js` e faça deploy
+3. **Settings** → **Variables** → adicione `BLOB_HOST` com o hostname do store
+4. **Settings** → **Domains & Routes** → **Add** → **Custom domain** →
+   `media.cantacrisopolis.com.br`
+
+### 4.3 Validação
 
 ```bash
 curl -sI https://media.cantacrisopolis.com.br/<pathname-de-um-arquivo>
@@ -107,13 +121,21 @@ curl -sI https://media.cantacrisopolis.com.br/<pathname-de-um-arquivo>
 - 2ª chamada: `200` + `cf-cache-status: HIT` ← confirma que a banda parou de sair do Blob
 - `content-type` correto (`audio/mpeg` para MP3)
 
-Se der `403`/`404` enquanto a URL canônica do Blob funciona, o Host Header
-override não pegou. Alternativa: um Cloudflare Worker em `media.cantacrisopolis.com.br`
-que faz `fetch` da URL canônica com `cf: { cacheEverything: true }`.
+Se vier `500 BLOB_HOST is not configured`, a variável não foi salva. Se vier
+`404`, confira o pathname — ele é exatamente o que vem depois do domínio na URL
+canônica do Blob.
 
-> Servir volume alto de áudio pelo Free tier esbarra na política de uso da
-> Cloudflare para mídia não-HTML. Para o porte de um concurso municipal não deve
-> ser problema, mas vale conhecer o limite.
+### 4.4 Limites a conhecer
+
+- **Workers Free: 100.000 requests/dia.** Cada arquivo servido conta, mesmo em
+  cache HIT (a rota sempre invoca o Worker). Um evento com milhares de votantes
+  ouvindo várias músicas pode chegar perto disso — vale acompanhar no dashboard.
+- **Requests com `Range`** (o que o navegador usa para dar seek em áudio) são
+  repassados ao Blob e respondem `206`. O cache é menos eficiente nesse caso;
+  o efeito é banda extra, não falha.
+- Servir volume alto de áudio pelo Free tier esbarra na política de uso da
+  Cloudflare para mídia não-HTML. Para o porte de um concurso municipal não deve
+  ser problema, mas vale conhecer o limite.
 
 ## 5. Deploy
 

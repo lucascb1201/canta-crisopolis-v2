@@ -97,8 +97,9 @@ Serverless Function na Vercel aceita no máximo ~4.5MB de body, e um MP3 estoura
 isso. A API só emite um token de upload de curta duração, depois de validar que
 quem pediu é admin.
 
-A leitura passa por `media.cantacrisopolis.com.br`, um proxy Cloudflare na frente
-do Blob, para que a banda dos MP3 seja absorvida pelo CDN.
+A leitura passa por `media.cantacrisopolis.com.br`, um Cloudflare Worker
+(`cloudflare/media-proxy.js`) que faz proxy do Blob, para que a banda dos MP3
+seja absorvida pelo CDN em vez de sair do Data Transfer da Vercel.
 
 Limites aplicados no servidor:
 
@@ -208,8 +209,8 @@ Teste a URL do CDN direto:
 curl -sI https://media.cantacrisopolis.com.br/<pathname>
 ```
 
-`403`/`404` normalmente significa que a Origin Rule com o Host Header override
-não está ativa — veja `DEPLOYMENT.md`.
+`500` significa que a variável `BLOB_HOST` do Worker não foi configurada;
+`404`, que o pathname está errado. Veja `DEPLOYMENT.md`.
 
 ### Problemas com fingerprint
 
