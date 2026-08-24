@@ -4,8 +4,9 @@
 
 ### 📦 Infraestrutura
 
-- ✅ Docker Compose com MongoDB e Next.js
-- ✅ Dockerfile otimizado para desenvolvimento
+- ✅ Deploy na Vercel (funções em gru1/São Paulo)
+- ✅ MongoDB Atlas em produção, Docker Compose com MongoDB local em dev
+- ✅ Vercel Blob para mídia, com Cloudflare como CDN de leitura
 - ✅ Configurações de ambiente (.env.example)
 
 ### 🗄️ Banco de Dados
@@ -14,7 +15,7 @@
 - ✅ Modelo de Votações (com opções e configurações)
 - ✅ Modelo de Votos (com prevenção de duplicados)
 - ✅ Modelo de Candidatos (inscrições)
-- ✅ Script de seed para criar admin padrão
+- ✅ Admin configurado por variáveis de ambiente (sem usuário no banco)
 
 ### 🔐 Autenticação e Segurança
 
@@ -100,33 +101,22 @@
 
 ## 🚀 Como Executar:
 
-### Método Rápido (Recomendado):
-
 ```bash
-./start.sh
+# 1. Subir o MongoDB local
+docker compose up -d
+
+# 2. Configurar as variáveis
+cp .env.example .env.local
+
+# 3. Rodar
+npm install && npm run dev
 ```
 
-### Método Manual:
+## 🔑 Credenciais:
 
-```bash
-# 1. Criar arquivo .env
-cp .env.example .env
-
-# 2. Iniciar containers
-docker-compose up -d
-
-# 3. Aguardar e criar admin
-docker-compose exec nextjs npm run seed
-
-# 4. Acessar http://localhost:3000
-```
-
-## 🔑 Credenciais Padrão:
-
-- **Usuário**: admin
-- **Senha**: admin123
-
-⚠️ **Altere a senha após o primeiro login!**
+Definidas em `ADMIN_USERNAME` e `ADMIN_PASSWORD`. Não há usuário padrão nem seed
+a rodar — a aplicação recusa autenticar se essas variáveis não estiverem
+definidas.
 
 ## 📍 URLs Importantes:
 
@@ -138,7 +128,7 @@ docker-compose exec nextjs npm run seed
 
 ## 🎯 Fluxo de Uso Completo:
 
-1. **Iniciar o sistema** com `./start.sh` ou docker-compose
+1. **Iniciar o sistema** (`docker compose up -d` + `npm run dev`)
 2. **Login como admin** em /admin/login
 3. **Criar votação** em /admin/votings/new
    - Adicionar título e descrição
@@ -154,9 +144,8 @@ docker-compose exec nextjs npm run seed
 
 ```
 voting/
-├── docker-compose.yml          # Orquestração de containers
-├── Dockerfile                  # Imagem Next.js
-├── start.sh                    # Script de inicialização rápida
+├── docker-compose.yml          # MongoDB local (desenvolvimento)
+├── vercel.json                 # Região das funções (gru1)
 ├── README.md                   # Documentação completa
 ├── QUICKSTART.md              # Guia rápido
 ├── package.json               # Dependências
@@ -164,8 +153,6 @@ voting/
 ├── tailwind.config.js         # Config Tailwind
 ├── next.config.js             # Config Next.js
 ├── .env.example               # Exemplo de variáveis
-├── scripts/
-│   └── seed.ts                # Seed do banco de dados
 ├── src/
 │   ├── app/                   # App Router Next.js
 │   │   ├── api/              # API Routes
@@ -183,19 +170,19 @@ voting/
 │   ├── lib/                  # Bibliotecas/Utilitários
 │   │   ├── mongodb.ts        # Conexão MongoDB
 │   │   ├── jwt.ts            # JWT utils
-│   │   ├── auth.ts           # Auth middleware
+│   │   ├── auth.ts           # Leitura do cookie de auth
 │   │   ├── fingerprint.ts    # Device ID
-│   │   └── upload.ts         # Upload de arquivos
+│   │   ├── media.ts          # URL do Blob -> CDN de mídia
+│   │   ├── blob.ts           # Remoção de blobs órfãos
+│   │   ├── votings.ts        # Validação e ocultação de votos
+│   │   └── uploadClient.ts   # Upload browser -> Vercel Blob
 │   └── models/               # Modelos Mongoose
-│       ├── Admin.ts
 │       ├── Voting.ts
 │       ├── Vote.ts
 │       └── Candidate.ts
-└── public/
-    └── uploads/              # Arquivos uploadados
-        ├── photos/           # Fotos dos candidatos
-        └── music/            # Músicas dos candidatos
 ```
+
+> Fotos e músicas vão para o Vercel Blob, não para o filesystem.
 
 ## 🔒 Segurança Implementada:
 

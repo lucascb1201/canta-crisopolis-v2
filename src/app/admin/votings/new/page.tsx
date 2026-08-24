@@ -11,6 +11,7 @@ import {
   FaArrowLeft,
 } from "react-icons/fa";
 import Link from "next/link";
+import { uploadOptionMedia } from "@/lib/uploadClient";
 
 interface VotingOption {
   id: string;
@@ -29,6 +30,7 @@ export default function NewVotingPage() {
     { id: "1", name: "", photoFile: null, musicFile: null },
   ]);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -66,29 +68,20 @@ export default function NewVotingPage() {
     setLoading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("title", title);
-      formData.append("description", description);
+      const uploadedOptions = await uploadOptionMedia(options, (done, total) =>
+        setProgress(`Enviando arquivos... ${done}/${total}`)
+      );
 
-      const optionsData = options.map((opt) => ({
-        id: opt.id,
-        name: opt.name,
-      }));
-
-      formData.append("options", JSON.stringify(optionsData));
-
-      options.forEach((option, index) => {
-        if (option.photoFile) {
-          formData.append(`photo_${index}`, option.photoFile);
-        }
-        if (option.musicFile) {
-          formData.append(`music_${index}`, option.musicFile);
-        }
-      });
+      setProgress("Salvando votação...");
 
       const response = await fetch("/api/votings", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description,
+          options: uploadedOptions,
+        }),
       });
 
       if (response.ok) {
@@ -103,6 +96,7 @@ export default function NewVotingPage() {
       alert("Erro ao criar votação");
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   };
 
@@ -260,7 +254,7 @@ export default function NewVotingPage() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <FaSpinner className="animate-spin" />
-                  Criando...
+                  {progress || "Criando..."}
                 </span>
               ) : (
                 "Criar Votação"

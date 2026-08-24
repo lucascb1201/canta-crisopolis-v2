@@ -1,62 +1,17 @@
-version: '3.8'
-
+# MongoDB apenas para desenvolvimento local.
+# Produção roda na Vercel com MongoDB Atlas — veja DEPLOYMENT.md.
 services:
   mongodb:
     image: mongo:7.0
     container_name: voting-mongodb
-    restart: always
+    restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: voting_password_2025
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-devpassword}
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
-    networks:
-      - voting-network
-
-  nextjs:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: voting-nextjs
-    restart: always
-    ports:
-      - "3000:3000"
-    environment:
-      - MONGODB_URI=mongodb://admin:voting_password_2025@mongodb:27017/voting?authSource=admin
-      - JWT_SECRET=your-secret-key-change-in-production
-      - NEXT_PUBLIC_API_URL=http://localhost:3000
-    volumes:
-      - ./src:/app/src
-      - ./public:/app/public
-      - ./next.config.js:/app/next.config.js
-      - ./tsconfig.json:/app/tsconfig.json
-      - /app/node_modules
-      - /app/.next
-    depends_on:
-      - mongodb
-    networks:
-      - voting-network
-    command: npm run dev
-
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: voting-cloudflared
-    restart: always
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    # environment:
-    #   - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-    env_file:
-      - .env
-    depends_on:
-      - nextjs
-    networks:
-      - voting-network
 
 volumes:
   mongodb_data:
-
-networks:
-  voting-network:
-    driver: bridge

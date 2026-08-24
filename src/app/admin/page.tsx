@@ -80,71 +80,44 @@ export default function AdminPage() {
     }
   };
 
-  const toggleVisibility = async (voting: Voting) => {
-    const formData = new FormData();
-    formData.append("title", voting.title);
-    formData.append("isVisible", (!voting.isVisible).toString());
-    formData.append("isClosed", voting.isClosed.toString());
-    formData.append("showResults", voting.showResults.toString());
-    formData.append("options", JSON.stringify(voting.options));
-
+  // Os três toggles só alternam uma flag; o resto da votação vai junto
+  // inalterado para não sobrescrever nada no PUT.
+  const patchVoting = async (
+    voting: Voting,
+    changes: Partial<Pick<Voting, "isVisible" | "isClosed" | "showResults">>
+  ) => {
     try {
       const response = await fetch(`/api/votings/${voting._id}`, {
         method: "PUT",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: voting.title,
+          description: voting.description,
+          isVisible: voting.isVisible,
+          isClosed: voting.isClosed,
+          showResults: voting.showResults,
+          ...changes,
+        }),
       });
 
       if (response.ok) {
         loadVotings();
+      } else {
+        alert("Erro ao atualizar votação");
       }
     } catch (error) {
-      console.error("Failed to toggle visibility:", error);
+      console.error("Failed to update voting:", error);
     }
   };
 
-  const toggleClosed = async (voting: Voting) => {
-    const formData = new FormData();
-    formData.append("title", voting.title);
-    formData.append("isVisible", voting.isVisible.toString());
-    formData.append("isClosed", (!voting.isClosed).toString());
-    formData.append("showResults", voting.showResults.toString());
-    formData.append("options", JSON.stringify(voting.options));
+  const toggleVisibility = (voting: Voting) =>
+    patchVoting(voting, { isVisible: !voting.isVisible });
 
-    try {
-      const response = await fetch(`/api/votings/${voting._id}`, {
-        method: "PUT",
-        body: formData,
-      });
+  const toggleClosed = (voting: Voting) =>
+    patchVoting(voting, { isClosed: !voting.isClosed });
 
-      if (response.ok) {
-        loadVotings();
-      }
-    } catch (error) {
-      console.error("Failed to toggle closed:", error);
-    }
-  };
-
-  const toggleResults = async (voting: Voting) => {
-    const formData = new FormData();
-    formData.append("title", voting.title);
-    formData.append("isVisible", voting.isVisible.toString());
-    formData.append("isClosed", voting.isClosed.toString());
-    formData.append("showResults", (!voting.showResults).toString());
-    formData.append("options", JSON.stringify(voting.options));
-
-    try {
-      const response = await fetch(`/api/votings/${voting._id}`, {
-        method: "PUT",
-        body: formData,
-      });
-
-      if (response.ok) {
-        loadVotings();
-      }
-    } catch (error) {
-      console.error("Failed to toggle results:", error);
-    }
-  };
+  const toggleResults = (voting: Voting) =>
+    patchVoting(voting, { showResults: !voting.showResults });
 
   if (authLoading || loading) {
     return (

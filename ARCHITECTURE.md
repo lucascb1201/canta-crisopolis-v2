@@ -130,16 +130,17 @@
          │ Nova Votação    │     + Upload arquivos
          └─────┬───────────┘
                │
-               │ 12. POST /api/votings
-               │     FormData com título,
-               │     descrição, opções,
-               │     fotos e músicas
+               │ 12a. POST /api/upload
+               │      (valida admin, tipo e
+               │      tamanho; devolve token)
+               │ 12b. Browser envia o arquivo
+               │      DIRETO ao Vercel Blob
                ▼
          ┌──────────────┐
-         │Upload Handler│ 13. Salva arquivos
-         └──────┬───────┘     em public/uploads
+         │ Vercel Blob  │ 13. Armazena e devolve
+         └──────┬───────┘     a URL ao browser
                 │
-                │ 14. Gera URLs
+                │ 14. POST /api/votings (JSON com as URLs)
                 ▼
          ┌─────────┐
          │MongoDB  │ 15. Salva votação
@@ -197,12 +198,8 @@
 
 ```
 voting (database)
-├── admins
-│   ├── _id: ObjectId
-│   ├── username: String (unique)
-│   ├── password: String (hashed)
-│   ├── email: String (unique)
-│   └── createdAt: Date
+│   (não há collection de admins: as credenciais vêm de
+│    ADMIN_USERNAME / ADMIN_PASSWORD nas variáveis de ambiente)
 │
 ├── votings
 │   ├── _id: ObjectId
@@ -249,8 +246,8 @@ voting (database)
 voting/
 │
 ├── 📦 Configuração
-│   ├── docker-compose.yml      # Orquestração Docker
-│   ├── Dockerfile              # Imagem Next.js
+│   ├── docker-compose.yml      # MongoDB local (desenvolvimento)
+│   ├── vercel.json             # Região das funções (gru1)
 │   ├── package.json            # Dependências
 │   ├── tsconfig.json           # Config TypeScript
 │   ├── tailwind.config.js      # Config Tailwind
@@ -264,12 +261,6 @@ voting/
 │   ├── FAQ.md                  # Perguntas frequentes
 │   ├── PROJECT_SUMMARY.md      # Resumo completo
 │   └── ARCHITECTURE.md         # Este arquivo
-│
-├── 🛠️ Scripts
-│   ├── start.sh                # Inicialização rápida
-│   ├── test.sh                 # Testes automatizados
-│   └── scripts/
-│       └── seed.ts             # Seed do banco
 │
 ├── 🎨 Frontend
 │   └── src/
@@ -329,17 +320,13 @@ voting/
 │       │   └── upload.ts       # Upload de arquivos
 │       │
 │       └── models/             # 🗂️ Modelos Mongoose
-│           ├── Admin.ts
 │           ├── Voting.ts
 │           ├── Vote.ts
 │           └── Candidate.ts
-│
-└── 📁 Públicos
-    └── public/
-        └── uploads/            # Arquivos uploadados
-            ├── photos/         # Fotos dos candidatos
-            └── music/          # Músicas
 ```
+
+> Fotos e músicas não ficam no repositório nem no filesystem: vão para o Vercel
+> Blob e são servidas pelo CDN em `media.cantacrisopolis.com.br`.
 
 ## Tecnologias e Propósito
 
@@ -369,9 +356,11 @@ voting/
 │  └─ MongoDB 7.0       ► Database NoSQL               │
 │                                                       │
 │  Infraestrutura                                       │
-│  ├─ Docker            ► Containerização               │
-│  ├─ Docker Compose    ► Orquestração                 │
-│  └─ Node.js 20        ► Runtime JavaScript           │
+│  ├─ Vercel            ► Hospedagem serverless        │
+│  ├─ MongoDB Atlas     ► Banco gerenciado             │
+│  ├─ Vercel Blob       ► Armazenamento de mídia       │
+│  ├─ Cloudflare        ► CDN de leitura da mídia      │
+│  └─ Docker Compose    ► MongoDB local (dev)          │
 │                                                       │
 └──────────────────────────────────────────────────────┘
 ```

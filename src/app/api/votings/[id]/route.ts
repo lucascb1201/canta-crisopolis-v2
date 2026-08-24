@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Voting from "@/models/Voting";
-import { requireAuth } from "@/lib/auth";
-import { saveFile } from "@/lib/upload";
+import Vote from "@/models/Vote";
+import { requireAuth, getAuthUser } from "@/lib/auth";
+import { deleteBlobs } from "@/lib/blob";
+import { sanitizeOptions, stripHiddenVotes } from "@/lib/votings";
+
+export const dynamic = "force-dynamic";
 
 // GET single voting
 export async function GET(
@@ -12,13 +16,17 @@ export async function GET(
   try {
     await dbConnect();
 
-    const voting = await Voting.findById(params.id);
+    const voting = await Voting.findById(params.id).lean();
 
     if (!voting) {
       return NextResponse.json({ error: "Voting not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ voting });
+    const isAdmin = !!getAuthUser(request);
+
+    return NextResponse.json({
+      voting: isAdmin ? voting : stripHiddenVotes(voting),
+    });
   } catch (error) {
     console.error("Get voting error:", error);
     return NextResponse.json(
@@ -37,13 +45,9 @@ export async function PUT(
     requireAuth(request);
     await dbConnect();
 
-    const formData = await request.formData();
-    const title = formData.get("title") as string;
-    const description = formData.get("description") as string;
-    const isVisible = formData.get("isVisible") === "true";
-    const isClosed = formData.get("isClosed") === "true";
-    const showResults = formData.get("showResults") === "true";
-    const optionsData = formData.get("options") as string;
+    const body = await request.json();
+    const { title, description, isVisible, isClosed, showResults, options } =
+      body;
 
     const voting = await Voting.findById(params.id);
 
@@ -52,48 +56,48 @@ export async function PUT(
     }
 
     if (title) voting.title = title;
-    if (description !== null) voting.description = description;
-    voting.isVisible = isVisible;
-    voting.isClosed = isClosed;
-    voting.showResults = showResults;
+    if (description !== undefined) voting.description = description;
+    if (isVisible !== undefined) voting.isVisible = !!isVisible;
+    if (isClosed !== undefined) voting.isClosed = !!isClosed;
+    if (showResults !== undefined) voting.showResults = !!showResults;
 
-    if (optionsData) {
-      const options = JSON.parse(optionsData);
+    let orphanedUrls: (string | undefined)[] = [];
 
-      const processedOptions = await Promise.all(
-        options.map(async (option: any, index: number) => {
-          const photoFile = formData.get(`photo_${index}`) as File | null;
-          const musicFile = formData.get(`music_${index}`) as File | null;
+    if (options !== undefined) {
+      const incoming = sanitizeOptions(options);
 
-          let photoUrl = option.photoUrl;
-          let musicUrl = option.musicUrl;
+      const previousUrls = new Set<string>();
+      voting.options.forEach((option: any) => {
+        if (option.photoUrl) previousUrls.add(option.photoUrl);
+        if (option.musicUrl) previousUrls.add(option.musicUrl);
+      });
 
-          if (photoFile && photoFile.size > 0) {
-            photoUrl = await saveFile(photoFile, "photo");
-          }
+      const processedOptions = incoming.map((option) => {
+        // Preserve existing votes
+        const existingOption = voting.options.find(
+          (o: any) => o.id === option.id
+        );
 
-          if (musicFile && musicFile.size > 0) {
-            musicUrl = await saveFile(musicFile, "music");
-          }
+        return {
+          ...option,
+          votes: existingOption ? existingOption.votes : 0,
+        };
+      });
 
-          // Preserve existing votes
-          const existingOption = voting.options.find(
-            (o: any) => o.id === option.id
-          );
+      // Toda URL que existia antes e não aparece mais vira um blob órfão
+      processedOptions.forEach((option) => {
+        if (option.photoUrl) previousUrls.delete(option.photoUrl);
+        if (option.musicUrl) previousUrls.delete(option.musicUrl);
+      });
 
-          return {
-            ...option,
-            photoUrl,
-            musicUrl,
-            votes: existingOption ? existingOption.votes : 0,
-          };
-        })
-      );
+      orphanedUrls = Array.from(previousUrls);
 
       voting.options = processedOptions;
     }
 
     await voting.save();
+
+    await deleteBlobs(orphanedUrls);
 
     return NextResponse.json({ voting });
   } catch (error: any) {
@@ -101,6 +105,10 @@ export async function PUT(
 
     if (error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (error.message === "InvalidMediaUrl") {
+      return NextResponse.json({ error: "Invalid media URL" }, { status: 400 });
     }
 
     return NextResponse.json(
@@ -124,6 +132,15 @@ export async function DELETE(
     if (!voting) {
       return NextResponse.json({ error: "Voting not found" }, { status: 404 });
     }
+
+    await Vote.deleteMany({ votingId: params.id });
+
+    await deleteBlobs(
+      voting.options.flatMap((option: any) => [
+        option.photoUrl,
+        option.musicUrl,
+      ])
+    );
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -7,36 +7,26 @@
 Execute o script de inicialização:
 
 ```bash
-./start.sh
+docker compose up -d     # sobe apenas o MongoDB
+cp .env.example .env.local
+npm install
+npm run dev
 ```
 
-Ou manualmente:
+Não há seed a rodar: o admin vem de `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
 
-```bash
-docker-compose up -d
-sleep 30
-docker-compose exec nextjs npm run seed
-```
+### ❓ Preciso instalar o Node.js?
 
-### ❓ O que fazer se o comando `./start.sh` não funcionar?
-
-Torne o script executável primeiro:
-
-```bash
-chmod +x start.sh
-./start.sh
-```
-
-### ❓ Preciso instalar o Node.js se estou usando Docker?
-
-Não! Com Docker, tudo roda dentro dos containers. Você só precisa do Docker e Docker Compose instalados.
+Sim. O Docker aqui serve só para o MongoDB de desenvolvimento — a aplicação roda
+direto na sua máquina com `npm run dev`, e em produção roda na Vercel.
 
 ### ❓ Como acesso o MongoDB?
 
-Use qualquer cliente MongoDB (MongoDB Compass, Studio 3T, etc.) com:
+Use qualquer cliente MongoDB (MongoDB Compass, Studio 3T, etc.) com a mesma
+string do seu `.env.local`, por exemplo:
 
 ```
-mongodb://admin:voting_password_2025@localhost:27017
+mongodb://admin:devpassword@localhost:27017
 ```
 
 ## Uso do Sistema
@@ -45,9 +35,10 @@ mongodb://admin:voting_password_2025@localhost:27017
 
 Certifique-se de que:
 
-1. Executou o seed: `docker-compose exec nextjs npm run seed`
-2. Está usando as credenciais corretas: admin / admin123
-3. Os containers estão rodando: `docker-compose ps`
+1. `ADMIN_USERNAME` e `ADMIN_PASSWORD` estão definidos (em `.env.local` no local,
+   nas Environment Variables da Vercel em produção)
+2. `JWT_SECRET` também está definido — sem ele a aplicação recusa autenticar
+3. Depois de alterar variáveis na Vercel, é preciso **redeploy**
 
 ### ❓ Posso votar mais de uma vez?
 
@@ -76,15 +67,18 @@ Não há limite técnico. Você pode adicionar quantas opções quiser.
 
 ### ❓ Qual o tamanho máximo de arquivo para upload?
 
-- **Fotos**: Recomendado até 5MB
-- **Músicas**: Recomendado até 10MB
+- **Fotos**: 5 MB
+- **Músicas**: 15 MB
 
-O limite padrão está configurado em 10MB no `next.config.js`.
+Esses limites são aplicados pelo servidor em `src/app/api/upload/route.ts`, antes
+de o arquivo começar a subir — não são apenas recomendações.
 
 ### ❓ Que formatos de arquivo são aceitos?
 
-- **Fotos**: JPG, PNG, GIF, WebP
-- **Músicas**: MP3, WAV, OGG, M4A
+- **Fotos**: JPEG, PNG, GIF, WebP
+- **Músicas**: MP3, WAV, OGG, MP4/M4A
+
+Arquivos de outros tipos são recusados no servidor, mesmo renomeados.
 
 ## Problemas Comuns
 
@@ -93,19 +87,19 @@ O limite padrão está configurado em 10MB no `next.config.js`.
 1. Verifique se o container está rodando:
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 2. Reinicie os containers:
 
 ```bash
-docker-compose restart
+docker compose restart
 ```
 
 3. Veja os logs:
 
 ```bash
-docker-compose logs mongodb
+docker compose logs mongodb
 ```
 
 ### ❓ Erro "Port 3000 already in use"
@@ -133,27 +127,27 @@ ports:
 
 ### ❓ Upload de arquivo não funciona
 
-1. Verifique se os diretórios existem:
+Os arquivos vão para o Vercel Blob, não para o disco.
+
+1. **Em desenvolvimento**, quase sempre falta o `BLOB_READ_WRITE_TOKEN`. Com o
+   Blob store já criado na Vercel:
 
 ```bash
-ls -la public/uploads
+npx vercel link
+npx vercel env pull .env.local
 ```
 
-2. Crie-os se necessário:
+2. Confira tipo e tamanho do arquivo contra os limites acima.
 
-```bash
-mkdir -p public/uploads/photos
-mkdir -p public/uploads/music
-```
-
-3. Verifique permissões:
-
-```bash
-chmod -R 755 public/uploads
-```
+3. Confirme que você está logado como admin — o token de upload só é emitido
+   para sessões autenticadas.
 
 ### ❓ Música não reproduz
 
+0. Em produção, teste a URL do CDN direto:
+   `curl -sI https://media.cantacrisopolis.com.br/<pathname>`.
+   `403`/`404` costuma indicar Origin Rule ausente na Cloudflare (veja
+   `DEPLOYMENT.md`).
 1. Verifique se o arquivo foi salvo corretamente
 2. Abra o console do navegador (F12) para ver erros
 3. Verifique se o formato do arquivo é suportado pelo navegador
@@ -204,8 +198,8 @@ Sim, mas precisaria:
 
 1. Substituir Mongoose por Prisma ou TypeORM
 2. Reescrever todos os modelos
-3. Ajustar as queries
-4. Configurar o PostgreSQL no Docker
+3. Ajustar as queries (incluindo o `$inc` atômico da contagem de votos)
+4. Provisionar o PostgreSQL
 
 ## Produção
 
@@ -217,30 +211,35 @@ Veja o guia completo em `DEPLOYMENT.md`.
 
 Sim! Checklist mínimo:
 
-- [ ] Alterar `JWT_SECRET`
-- [ ] Alterar senha do MongoDB
-- [ ] Alterar senha do admin
-- [ ] Configurar HTTPS
-- [ ] Usar MongoDB externo (Atlas)
-- [ ] Configurar backup
+- [ ] `JWT_SECRET` forte (`openssl rand -hex 32`)
+- [ ] `ADMIN_USERNAME` / `ADMIN_PASSWORD` definidos, com senha forte
+- [ ] Cluster no MongoDB Atlas com senha forte e Network Access liberado
+- [ ] Blob store criado e conectado ao projeto na Vercel
+- [ ] `media.cantacrisopolis.com.br` configurado na Cloudflare
+- [ ] Backup (`mongodump`) antes e depois da apuração
+
+HTTPS vem pronto da Vercel — não há nada a configurar.
 
 ### ❓ Quanto custa hospedar?
 
-Depende do tráfego:
+A configuração atual custa **US$ 0/mês**: Vercel Hobby + MongoDB Atlas M0 +
+Cloudflare Free.
 
-- **Gratuito**: Vercel + MongoDB Atlas (tier gratuito)
-- **Pequeno**: $10-20/mês (VPS básico)
-- **Médio**: $50-100/mês (VPS + MongoDB gerenciado)
-- **Grande**: $200+/mês (infraestrutura escalável)
+O que pode gerar custo conforme o volume:
+
+- **Vercel Blob**: cobra por GB armazenado. Com a Cloudflare na frente, a saída
+  de dados fica limitada aos cache MISS.
+- **Atlas M0**: 512 MB e sem backup automático. Para um evento com resultado
+  oficial, considere o M10 (~US$ 57/mês) ou faça `mongodump` manual.
 
 ### ❓ Suporta quantos usuários simultâneos?
 
-Com a configuração padrão:
+As funções da Vercel escalam sozinhas, então o gargalo é o MongoDB: o Atlas M0
+tem limite de 500 conexões, e cada instância de função abre um pool de até 10
+(`src/lib/mongodb.ts`).
 
-- **Docker local**: ~100 usuários simultâneos
-- **VPS básico**: ~500 usuários
-- **VPS otimizado**: ~2000 usuários
-- **Infraestrutura escalável**: ilimitado
+Na prática, um M0 dá conta de um concurso municipal com folga. Se a apuração for
+concentrada em poucos minutos com milhares de votantes, suba para M10.
 
 ## Personalização
 
@@ -279,37 +278,36 @@ Sim! O sistema é totalmente customizável. Você pode:
 
 ### ❓ Os dados estão seguros?
 
-Sim, implementamos:
+O que existe hoje:
 
-- JWT em cookies HTTP-only
-- Hash de senhas com bcrypt
-- Validação de dados
-- Proteção contra SQL injection (NoSQL)
-- CORS configurado
-- Device fingerprinting
+- JWT em cookie HTTP-only, `secure` em produção
+- Credenciais do admin em variáveis de ambiente (não há senha no banco)
+- Comparação de credenciais em tempo constante
+- Validação de tipo e tamanho no upload, no servidor
+- Só URLs do próprio Blob store são aceitas como mídia de uma votação
+- Índice único no banco impedindo voto duplicado por dispositivo
 
 ### ❓ Alguém pode burlar o sistema de votação?
 
-É muito difícil. O fingerprinting considera dezenas de fatores do dispositivo. Para burlar, seria necessário:
+**Sim, com pouco esforço.** É importante ter isso claro antes de usar o sistema
+para um resultado oficial.
 
-- Usar dispositivos diferentes
-- Usar VMs ou containers diferentes
-- Manipular Canvas/WebGL fingerprints
+O fingerprint é calculado no navegador e enviado pela aplicação — o servidor não
+tem como verificar se é legítimo. Um `curl` com fingerprints aleatórios registra
+quantos votos quiser, e não há rate limiting nem CAPTCHA.
+
+O FingerprintJS OSS é uma barreira contra o votante casual que tenta votar duas
+vezes, não contra fraude deliberada. Para um concurso com resultado disputado,
+seria preciso acrescentar pelo menos rate limiting por IP e um CAPTCHA, ou exigir
+identificação do votante.
 
 ### ❓ Como altero a senha do admin?
 
-1. Acesse o MongoDB
-2. Execute:
+Edite a variável `ADMIN_PASSWORD` (em `.env.local` no local, nas Environment
+Variables da Vercel em produção) e faça um novo deploy.
 
-```javascript
-use voting
-db.admins.updateOne(
-  { username: "admin" },
-  { $set: { password: await bcrypt.hash("nova-senha", 10) } }
-)
-```
-
-Ou crie uma rota API para isso.
+Os cookies já emitidos continuam válidos por até 7 dias. Para derrubar as sessões
+abertas na hora, troque também o `JWT_SECRET`.
 
 ### ❓ Posso ver quem votou em quem?
 

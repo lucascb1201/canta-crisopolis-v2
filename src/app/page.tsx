@@ -5,13 +5,14 @@ import { useDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
 import { FaMusic, FaCheckCircle, FaSpinner } from "react-icons/fa";
 import Link from "next/link";
 import MusicPlayer from "@/components/MusicPlayer";
+import { toPublicMediaUrl } from "@/lib/media";
 
 interface VotingOption {
   id: string;
   name: string;
   photoUrl?: string;
   musicUrl?: string;
-  votes: number;
+  votes?: number;
 }
 
 interface Voting {
@@ -112,7 +113,7 @@ export default function Home() {
   };
 
   const getTotalVotes = (options: VotingOption[]) => {
-    return options.reduce((sum, opt) => sum + opt.votes, 0);
+    return options.reduce((sum, opt) => sum + (opt.votes ?? 0), 0);
   };
 
   const getPercentage = (votes: number, total: number) => {
@@ -160,8 +161,7 @@ export default function Home() {
           <div className="space-y-12">
             {votings.map((poll) => {
               const hasVoted = !!votedPolls[poll._id];
-              const canShowResults =
-                poll.showResults || hasVoted || poll.isClosed;
+              const canShowResults = poll.showResults || poll.isClosed;
               const totalVotes = getTotalVotes(poll.options);
 
               return (
@@ -187,7 +187,7 @@ export default function Home() {
                       const hasVotedForThis =
                         votedPolls[poll._id] === option.id;
                       const percentage = getPercentage(
-                        option.votes,
+                        option.votes ?? 0,
                         totalVotes
                       );
 
@@ -216,7 +216,7 @@ export default function Home() {
                           <div className="aspect-square bg-gradient-radial from-primary-900 to-gray-900">
                             {option.photoUrl ? (
                               <img
-                                src={option.photoUrl}
+                                src={toPublicMediaUrl(option.photoUrl)}
                                 alt={option.name}
                                 className="w-full h-full object-cover"
                               />
@@ -239,7 +239,7 @@ export default function Home() {
                             {/* Music Player */}
                             {option.musicUrl && (
                               <MusicPlayer
-                                url={option.musicUrl}
+                                url={toPublicMediaUrl(option.musicUrl)}
                                 name={option.name}
                               />
                             )}
@@ -248,7 +248,7 @@ export default function Home() {
                             {canShowResults && (
                               <div className="mt-3">
                                 <div className="flex justify-between text-sm mb-1">
-                                  <span>Votos: {option.votes}</span>
+                                  <span>Votos: {option.votes ?? 0}</span>
                                   <span>{percentage}%</span>
                                 </div>
                                 <div className="w-full bg-gray-700 rounded-full h-2">

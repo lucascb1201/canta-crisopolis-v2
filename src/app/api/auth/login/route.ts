@@ -1,12 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import dbConnect from "@/lib/mongodb";
-import Admin from "@/models/Admin";
+import { createHash, timingSafeEqual } from "crypto";
 import { generateToken } from "@/lib/jwt";
+
+export const dynamic = "force-dynamic";
+
+// Compara em tempo constante. O digest normaliza o tamanho, evitando que
+// timingSafeEqual lance quando os buffers têm comprimentos diferentes.
+const safeEqual = (a: string, b: string): boolean => {
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  return timingSafeEqual(digest(a), digest(b));
+};
 
 export async function POST(request: NextRequest) {
   try {
-    await dbConnect();
+    const adminUsername = process.env.ADMIN_USERNAME;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (!adminUsername || !adminPassword) {
+      console.error(
+        "ADMIN_USERNAME and ADMIN_PASSWORD must be defined to enable login"
+      );
+      return NextResponse.json(
+        { error: "Authentication is not configured" },
+        { status: 500 }
+      );
+    }
 
     const { username, password } = await request.json();
 
@@ -17,42 +35,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const admin = await Admin.findOne({ username });
+    const isValid =
+      safeEqual(username, adminUsername) && safeEqual(password, adminPassword);
 
-    if (!admin) {
+    if (!isValid) {
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
       );
     }
 
-    const isValidPassword = await bcrypt.compare(password, admin.password);
-
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
-      );
-    }
-
-    const token = generateToken({
-      userId: admin._id.toString(),
-      username: admin.username,
-    });
+    const token = generateToken({ username: adminUsername });
 
     const response = NextResponse.json({
       success: true,
-      user: {
-        id: admin._id,
-        username: admin.username,
-        email: admin.email,
-      },
+      user: { username: adminUsername },
     });
 
     response.cookies.set("auth-token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax",
+      path: "/",
       maxAge: 60 * 60 * 24 * 7, // 7 days
     });
 

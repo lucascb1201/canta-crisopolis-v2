@@ -15,13 +15,15 @@ Se você quer começar rapidamente:
 2. **Execute:**
 
    ```bash
-   ./start.sh
+   docker compose up -d          # MongoDB local
+   cp .env.example .env.local    # preencha as variáveis
+   npm install && npm run dev
    ```
 
 3. **Acesse:**
    - Homepage: http://localhost:3000
    - Admin: http://localhost:3000/admin/login
-   - Credenciais: `admin` / `admin123`
+   - Credenciais: as que você definiu em `ADMIN_USERNAME` / `ADMIN_PASSWORD`
 
 ---
 
@@ -56,8 +58,8 @@ Se você quer começar rapidamente:
 
 ```
 📦 Arquivos de Configuração
-├── docker-compose.yml          # Orquestração Docker
-├── Dockerfile                  # Imagem Next.js
+├── docker-compose.yml          # MongoDB local (desenvolvimento)
+├── vercel.json                 # Região das funções (gru1)
 ├── package.json                # Dependências NPM
 ├── tsconfig.json              # Config TypeScript
 ├── tailwind.config.js         # Config Tailwind CSS
@@ -65,15 +67,6 @@ Se você quer começar rapidamente:
 ├── postcss.config.js          # Config PostCSS
 ├── .env.example               # Template de variáveis
 └── .gitignore                 # Arquivos ignorados
-```
-
-### 🛠️ Scripts Utilitários
-
-```
-🔧 Scripts
-├── start.sh                   # 🚀 Inicia o sistema
-├── test.sh                    # 🧪 Testa o sistema
-└── scripts/seed.ts            # 🌱 Seed do banco de dados
 ```
 
 ### 🎨 Frontend - Páginas
@@ -163,8 +156,8 @@ Se você quer começar rapidamente:
 ### ❓ Resolvendo Problemas
 
 1. Consulte primeiro o **[FAQ.md](./FAQ.md)**
-2. Verifique os logs: `docker-compose logs -f`
-3. Execute o teste: `./test.sh`
+2. Localmente, veja os logs do `npm run dev` e `docker compose logs -f mongodb`
+3. Em produção, use **Observability** e **Logs** no dashboard da Vercel
 
 ---
 
@@ -289,8 +282,8 @@ Se você quer começar rapidamente:
 ### Auto-Atendimento (Recomendado)
 
 1. **[FAQ.md](./FAQ.md)** - 90% das dúvidas estão aqui
-2. **Logs do Sistema**: `docker-compose logs -f`
-3. **Script de Teste**: `./test.sh`
+2. **Logs locais**: saída do `npm run dev`
+3. **Logs de produção**: dashboard da Vercel → Logs
 
 ### Recursos Adicionais
 
@@ -330,7 +323,6 @@ Aprenda nesta ordem:
 ## 📝 Notas Finais
 
 - **Mantenha a documentação atualizada** se fizer mudanças
-- **Use os scripts** (`start.sh`, `test.sh`) - eles facilitam a vida
 - **Leia o FAQ primeiro** antes de buscar ajuda
 - **Customize** o sistema para suas necessidades
 - **Contribua** com melhorias via Pull Request

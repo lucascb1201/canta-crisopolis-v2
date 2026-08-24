@@ -40,6 +40,7 @@ export default function MusicPlayer({ url, name }: MusicPlayerProps) {
       <audio
         ref={audioRef}
         src={url}
+        preload="none"
         onEnded={handleEnded}
         onPause={() => setIsPlaying(false)}
       />

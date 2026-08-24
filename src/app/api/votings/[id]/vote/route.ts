@@ -3,10 +3,14 @@ import dbConnect from "@/lib/mongodb";
 import Voting from "@/models/Voting";
 import Vote from "@/models/Vote";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  let voteId: unknown = null;
+
   try {
     await dbConnect();
 
@@ -20,7 +24,7 @@ export async function POST(
     }
 
     // Check if voting exists and is open
-    const voting = await Voting.findById(params.id);
+    const voting = await Voting.findById(params.id).lean<any>();
 
     if (!voting) {
       return NextResponse.json({ error: "Voting not found" }, { status: 404 });
@@ -33,17 +37,12 @@ export async function POST(
       );
     }
 
-    // Check if this device already voted
-    const existingVote = await Vote.findOne({
-      votingId: params.id,
-      deviceFingerprint,
-    });
+    // Validar a opção ANTES de gravar o voto: um optionId inválido gravado
+    // dispara o índice único e bloqueia o dispositivo permanentemente.
+    const option = voting.options.find((opt: any) => opt.id === optionId);
 
-    if (existingVote) {
-      return NextResponse.json(
-        { error: "You have already voted in this poll" },
-        { status: 400 }
-      );
+    if (!option) {
+      return NextResponse.json({ error: "Invalid option" }, { status: 400 });
     }
 
     // Get IP and User Agent
@@ -53,8 +52,8 @@ export async function POST(
       "unknown";
     const userAgent = request.headers.get("user-agent") || "unknown";
 
-    // Create vote record
-    await Vote.create({
+    // O índice único {votingId, deviceFingerprint} é a barreira anti-duplicata
+    const vote = await Vote.create({
       votingId: params.id,
       optionId,
       deviceFingerprint,
@@ -62,15 +61,23 @@ export async function POST(
       userAgent,
     });
 
-    // Update vote count
-    const option = voting.options.find((opt: any) => opt.id === optionId);
+    voteId = vote._id;
 
-    if (!option) {
-      return NextResponse.json({ error: "Invalid option" }, { status: 400 });
+    // $inc é atômico; um read-modify-write perderia votos concorrentes
+    const result = await Voting.updateOne(
+      { _id: params.id, isClosed: false, "options.id": optionId },
+      { $inc: { "options.$.votes": 1 } }
+    );
+
+    if (result.matchedCount === 0) {
+      // A votação fechou ou a opção sumiu entre a leitura e a escrita
+      await Vote.deleteOne({ _id: voteId });
+
+      return NextResponse.json(
+        { error: "This voting is no longer accepting votes" },
+        { status: 400 }
+      );
     }
-
-    option.votes += 1;
-    await voting.save();
 
     return NextResponse.json({
       success: true,
@@ -85,6 +92,10 @@ export async function POST(
         { error: "You have already voted in this poll" },
         { status: 400 }
       );
+    }
+
+    if (voteId) {
+      await Vote.deleteOne({ _id: voteId }).catch(() => {});
     }
 
     return NextResponse.json(

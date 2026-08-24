@@ -11,6 +11,7 @@ import {
   FaArrowLeft,
 } from "react-icons/fa";
 import Link from "next/link";
+import { uploadOptionMedia } from "@/lib/uploadClient";
 
 interface VotingOption {
   id: string;
@@ -38,6 +39,7 @@ export default function VotingFormPage() {
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingVoting, setLoadingVoting] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -104,37 +106,34 @@ export default function VotingFormPage() {
     setLoading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("title", title);
-      formData.append("description", description);
-      formData.append("isVisible", isVisible.toString());
-      formData.append("isClosed", isClosed.toString());
-      formData.append("showResults", showResults.toString());
+      const uploadedOptions = await uploadOptionMedia(
+        options.map((opt) => ({
+          id: opt.id,
+          name: opt.name,
+          photoFile: opt.photoFile ?? null,
+          musicFile: opt.musicFile ?? null,
+          photoUrl: opt.photoUrl,
+          musicUrl: opt.musicUrl,
+        })),
+        (done, total) => setProgress(`Enviando arquivos... ${done}/${total}`)
+      );
 
-      const optionsData = options.map((opt) => ({
-        id: opt.id,
-        name: opt.name,
-        photoUrl: opt.photoUrl,
-        musicUrl: opt.musicUrl,
-      }));
-
-      formData.append("options", JSON.stringify(optionsData));
-
-      options.forEach((option, index) => {
-        if (option.photoFile) {
-          formData.append(`photo_${index}`, option.photoFile);
-        }
-        if (option.musicFile) {
-          formData.append(`music_${index}`, option.musicFile);
-        }
-      });
+      setProgress("Salvando votação...");
 
       const url = isEdit ? `/api/votings/${votingId}` : "/api/votings";
       const method = isEdit ? "PUT" : "POST";
 
       const response = await fetch(url, {
         method,
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description,
+          isVisible,
+          isClosed,
+          showResults,
+          options: uploadedOptions,
+        }),
       });
 
       if (response.ok) {
@@ -153,6 +152,7 @@ export default function VotingFormPage() {
       alert("Erro ao salvar votação");
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   };
 
@@ -354,7 +354,7 @@ export default function VotingFormPage() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <FaSpinner className="animate-spin" />
-                  Salvando...
+                  {progress || "Salvando..."}
                 </span>
               ) : isEdit ? (
                 "Atualizar Votação"

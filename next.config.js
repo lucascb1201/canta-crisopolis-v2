@@ -1,13 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    serverActions: {
-      bodySizeLimit: "10mb",
-    },
-  },
   images: {
-    domains: ["localhost"],
+    remotePatterns: [
+      { protocol: "https", hostname: "media.cantacrisopolis.com.br" },
+      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
+    ],
   },
 };
 
