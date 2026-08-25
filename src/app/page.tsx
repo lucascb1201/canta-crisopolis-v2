@@ -38,11 +38,16 @@ export default function Home() {
     loadVotings();
   }, []);
 
+  // A chave são os ids, não o array: atualizar contagens localmente após um
+  // voto não deve disparar uma nova consulta.
+  const votingIdsKey = votings.map((poll) => poll._id).join(",");
+
   useEffect(() => {
     if (fingerprint && votings.length > 0) {
       checkVotes();
     }
-  }, [fingerprint, votings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fingerprint, votingIdsKey]);
 
   const loadVotings = async () => {
     try {
@@ -57,28 +62,23 @@ export default function Home() {
   };
 
   const checkVotes = async () => {
-    if (!fingerprint) return;
+    if (!fingerprint || votings.length === 0) return;
 
-    const voted: Record<string, string> = {};
+    try {
+      const response = await fetch("/api/votes/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceFingerprint: fingerprint,
+          votingIds: votings.map((poll) => poll._id),
+        }),
+      });
 
-    for (const poll of votings) {
-      try {
-        const response = await fetch(`/api/votings/${poll._id}/check-vote`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ deviceFingerprint: fingerprint }),
-        });
-
-        const data = await response.json();
-        if (data.hasVoted) {
-          voted[poll._id] = data.votedOptionId;
-        }
-      } catch (error) {
-        console.error("Failed to check vote:", error);
-      }
+      const data = await response.json();
+      setVotedPolls(data.votes ?? {});
+    } catch (error) {
+      console.error("Failed to check votes:", error);
     }
-
-    setVotedPolls(voted);
   };
 
   const handleVote = async (votingId: string) => {
@@ -100,8 +100,27 @@ export default function Home() {
         const data = await response.json();
         alert(data.error || "Failed to vote");
       } else {
-        setVotedPolls({ ...votedPolls, [votingId]: selectedOption[votingId] });
-        loadVotings(); // Reload to get updated vote counts
+        const optionId = selectedOption[votingId];
+
+        setVotedPolls({ ...votedPolls, [votingId]: optionId });
+
+        // Atualiza a contagem localmente em vez de recarregar tudo: recarregar
+        // custaria uma listagem e uma nova consulta de votos por votante.
+        setVotings((polls) =>
+          polls.map((poll) =>
+            poll._id !== votingId
+              ? poll
+              : {
+                  ...poll,
+                  options: poll.options.map((option) =>
+                    option.id === optionId && option.votes !== undefined
+                      ? { ...option, votes: option.votes + 1 }
+                      : option
+                  ),
+                }
+          )
+        );
+
         alert("Voto registrado com sucesso!");
       }
     } catch (error) {

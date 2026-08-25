@@ -233,12 +233,34 @@ O que pode gerar custo conforme o volume:
 
 ### ❓ Suporta quantos usuários simultâneos?
 
-As funções da Vercel escalam sozinhas, então o gargalo é o MongoDB: o Atlas M0
-tem limite de 500 conexões, e cada instância de função abre um pool de até 10
-(`src/lib/mongodb.ts`).
+As funções da Vercel escalam sozinhas, então o gargalo é o **limite de 100
+operações por segundo do Atlas M0**.
 
-Na prática, um M0 dá conta de um concurso municipal com folga. Se a apuração for
-concentrada em poucos minutos com milhares de votantes, suba para M10.
+Medindo o custo real de cada fluxo (via `opcounters` do MongoDB):
+
+| | Operações | Capacidade |
+| --- | --- | --- |
+| Um voto isolado | 3 | ~33 votos/s |
+| Um votante completo (abre, checa, vota) | 5 | ~20 votantes/s |
+
+O custo por votante é **fixo**, não cresce com o número de votações visíveis:
+a consulta de votos já feitos é uma requisição só (`POST /api/votes/check`),
+resolvida numa única query pelo índice `{votingId, deviceFingerprint}`.
+
+A aplicação em si aguenta bem mais — num teste local com Mongo sem limites,
+foram 599 votos/s com 30 requisições concorrentes e nenhuma falha. Quem trava é
+o tier gratuito do banco.
+
+Dois detalhes importantes:
+
+- O M0 **não rejeita** quando passa de 100 ops/s: ele enfileira, reduz a
+  velocidade da rede e impõe 1s de cooldown. Os votantes veem lentidão
+  crescente e, se a fila passar do timeout da função, erro.
+- `maxPoolSize` é 3 (`src/lib/mongodb.ts`), então o teto de 500 conexões do M0
+  comporta ~166 instâncias de função simultâneas.
+
+Para um concurso municipal isso é folgado. Se a apuração concentrar milhares de
+votos em poucos minutos, o M10 remove o teto de 100 ops/s.
 
 ## Personalização
 

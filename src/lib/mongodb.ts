@@ -27,11 +27,13 @@ async function dbConnect() {
   }
 
   if (!cached.promise) {
-    // Em serverless cada instância mantém o próprio pool; o default de 100 do
-    // driver satura o cluster rapidamente quando há muitas lambdas ativas.
+    // Cada instância de função mantém o próprio pool e atende uma requisição
+    // por vez, então um pool grande só desperdiça o teto de conexões do
+    // cluster. Com 3, o limite de 500 do Atlas M0 comporta ~166 instâncias
+    // simultâneas; com o default de 100 do driver, cinco já o estourariam.
     const opts = {
       bufferCommands: false,
-      maxPoolSize: 10,
+      maxPoolSize: 3,
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
     };
